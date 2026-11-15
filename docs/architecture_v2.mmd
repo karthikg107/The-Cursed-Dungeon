@@ -1,0 +1,24 @@
+flowchart TD
+    P([Player]) -->|natural-language message| UI[Streamlit UI<br/>version-2/app.py]
+    UI -->|message| ENG[Python Game Engine<br/>game_engine.process_action]
+    subgraph PY [Python decides]
+        ENG --> VAL{Action validator<br/>manipulation check, submissions,<br/>inventory, object, trial order}
+        CFG[(Puzzle configuration<br/>game_config.py<br/>SOLUTIONS - never sent to AI)] --> VAL
+        VAL <-->|read / update| ST[(Structured game state<br/>dict in game_state.py)]
+    end
+    VAL -->|result: event + fact| NAR[AI Narrator<br/>ai_narrator.py]
+    ST -->|public summary only| NAR
+    NAR -->|1. try| G1[Gemini 3.8 Flash]
+    G1 -->|error| G2[Gemini 3.7 Flash]
+    G2 -->|error| TXT[Engine's own text]
+    G1 --> CHK{Safety check<br/>no leaked answers,<br/>no fake escape}
+    G2 --> CHK
+    CHK -->|unsafe| TXT
+    CHK -->|safe narration| UI
+    TXT --> UI
+    ST --> UI
+    UI -->|story + official result + sidebar| P
+    classDef ai fill:#fde2c8,stroke:#c2410c;
+    classDef py fill:#dbeafe,stroke:#1d4ed8;
+    class G1,G2 ai;
+    class ENG,VAL,CFG,ST,CHK,TXT,NAR py;

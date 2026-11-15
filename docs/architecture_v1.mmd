@@ -1,0 +1,17 @@
+flowchart TD
+    P([Player]) -->|natural-language message| UI[Streamlit UI<br/>version-1/app.py]
+    UI -->|message| GM[Game Master<br/>game_master.py]
+    SP[System prompt with story,<br/>rules AND answers<br/>prompts.py] -.-> G1
+    GM -->|1. try| G1[Gemini 3.8 Flash]
+    G1 -->|error / quota 429| G2[Gemini 3.7 Flash<br/>history transferred]
+    G2 -->|error / quota 429| OFF[Offline rule engine<br/>Python dictionaries]
+    G1 -->|story text +<br/>GAME_STATE line| PARSE
+    G2 -->|story text +<br/>GAME_STATE line| PARSE
+    OFF -->|story text +<br/>GAME_STATE line| PARSE[Status parser<br/>regex on GAME_STATE]
+    PARSE -->|trials, curse, inventory,<br/>escaped, game_over| SS[(st.session_state)]
+    SS --> UI
+    UI -->|chat + sidebar| P
+    classDef ai fill:#fde2c8,stroke:#c2410c;
+    classDef py fill:#dbeafe,stroke:#1d4ed8;
+    class G1,G2,SP ai;
+    class OFF,PARSE,SS,GM py;
