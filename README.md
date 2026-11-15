@@ -164,7 +164,7 @@ The-Cursed-Dungeon/
 │   ├── ai_narrator.py          # Gemini narration + safety check + fallback
 │   ├── test_adversarial.py     # 15 tests
 │   └── requirements.txt
-├── docs/                       # report + architecture diagrams
+├── docs/                       # report (PDF + Word) + architecture diagrams
 ├── screenshots/
 ├── .env.example
 ├── .gitignore
@@ -181,4 +181,4 @@ The-Cursed-Dungeon/
 
 ## 13. Report
 
-See [`docs/REPORT.md`](docs/REPORT.md) ([PDF](docs/Report_The_Cursed_Dungeon.pdf)).
+The project report (PDF): [`docs/AI-Escape-Room_Report_Karthik.pdf`](docs/AI-Escape-Room_Report_Karthik.pdf). The Word version is in the same folder.
