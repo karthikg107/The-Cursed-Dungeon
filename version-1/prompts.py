@@ -134,5 +134,24 @@ Start by welcoming the player to the dungeon,
 describing the room, introducing the five objects,
 and explaining the three-trial challenge.
 Do not reveal any puzzle answers in the introduction.
+
+
+IMPORTANT: GAME STATUS REPORTING
+
+At the end of EVERY response, include exactly one status line using this format:
+
+[[GAME_STATE: trials=0; curse=0; inventory=none; escaped=false; game_over=false]]
+
+Rules:
+- trials: Number of completed trials, from 0 to 3.
+- curse: Number of incorrect puzzle submissions, from 0 to 3.
+- inventory: List of collected items separated by commas, or none.
+- escaped: true only after the player successfully completes the final trial and escapes.
+- game_over: true when the player reaches 3 incorrect puzzle submissions or successfully escapes.
+- Keep the status line accurate and consistent with the conversation.
+- Never count ordinary exploration or questions as incorrect puzzle submissions.
+- Always include the status line, even when the player asks an ordinary question.
+- Do not reveal puzzle answers through the status line.
+
 """
 

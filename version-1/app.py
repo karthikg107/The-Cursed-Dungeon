@@ -1,4 +1,5 @@
 
+import re
 import streamlit as st
 
 from game_master import create_game_chat, send_game_message
@@ -8,42 +9,106 @@ from game_config import (
     INTRODUCTION,
     ROOM_OBJECTS,
     TOTAL_TRIALS,
-    MAX_CURSE_MARKS
+    MAX_CURSE_MARKS,
 )
 
 st.set_page_config(
     page_title=GAME_TITLE,
     page_icon="🏰",
-    layout="wide"
+    layout="wide",
 )
 
-# Session state
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# --------------------------------
+# INITIALIZE GAME SESSION
+# --------------------------------
 
-if "game_started" not in st.session_state:
-    st.session_state.game_started = False
+def initialize_game():
+    defaults = {
+        "messages": [],
+        "game_started": False,
+        "game_over": False,
+        "escaped": False,
+        "inventory": [],
+        "curse_marks": 0,
+        "trials_completed": 0,
+        "chat": None,
+    }
 
-if "game_over" not in st.session_state:
-    st.session_state.game_over = False
-
-if "inventory" not in st.session_state:
-    st.session_state.inventory = []
-
-if "curse_marks" not in st.session_state:
-    st.session_state.curse_marks = 0
-
-if "chat" not in st.session_state:
-    st.session_state.chat = None
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 
-# Start or restart game
+initialize_game()
+
+
+# --------------------------------
+# READ AI GAME STATUS
+# --------------------------------
+
+def update_game_status(response):
+    pattern = (
+        r"\[\[GAME_STATE:\s*"
+        r"trials=(\d+);\s*"
+        r"curse=(\d+);\s*"
+        r"inventory=(.*?);\s*"
+        r"escaped=(true|false);\s*"
+        r"game_over=(true|false)"
+        r"\s*\]\]"
+    )
+
+    match = re.search(pattern, response, re.IGNORECASE)
+
+    if match:
+        st.session_state.trials_completed = min(
+            int(match.group(1)), TOTAL_TRIALS
+        )
+
+        st.session_state.curse_marks = min(
+            int(match.group(2)), MAX_CURSE_MARKS
+        )
+
+        inventory_text = match.group(3).strip()
+
+        if inventory_text.lower() == "none":
+            st.session_state.inventory = []
+        else:
+            st.session_state.inventory = [
+                item.strip()
+                for item in inventory_text.split(",")
+                if item.strip()
+            ]
+
+        st.session_state.escaped = (
+            match.group(4).lower() == "true"
+        )
+
+        st.session_state.game_over = (
+            match.group(5).lower() == "true"
+        )
+
+        # Remove technical status information from the chat.
+        response = re.sub(
+            pattern,
+            "",
+            response,
+            flags=re.IGNORECASE,
+        ).strip()
+
+    return response
+
+
+# --------------------------------
+# START OR RESTART GAME
+# --------------------------------
+
 def start_game():
-
     st.session_state.messages = []
     st.session_state.inventory = []
     st.session_state.curse_marks = 0
+    st.session_state.trials_completed = 0
     st.session_state.game_over = False
+    st.session_state.escaped = False
     st.session_state.game_started = True
 
     st.session_state.chat = create_game_chat(SYSTEM_PROMPT)
@@ -55,51 +120,70 @@ def start_game():
         "Use this story introduction:\n" + INTRODUCTION
     )
 
+    opening_message = update_game_status(opening_message)
+
     st.session_state.messages.append({
         "role": "assistant",
-        "content": opening_message
+        "content": opening_message,
     })
 
 
-# Send player message
-def send_message(user_message):
+# --------------------------------
+# SEND PLAYER MESSAGE
+# --------------------------------
 
+def send_player_message(user_message):
     st.session_state.messages.append({
         "role": "user",
-        "content": user_message
+        "content": user_message,
     })
 
     response = send_game_message(
         st.session_state.chat,
-        user_message
+        user_message,
     )
+
+    response = update_game_status(response)
 
     st.session_state.messages.append({
         "role": "assistant",
-        "content": response
+        "content": response,
     })
 
 
-# Main title
+# --------------------------------
+# MAIN INTERFACE
+# --------------------------------
+
 st.title("🏰 THE CURSED DUNGEON")
-st.caption("An AI-Powered Escape Room | Version 1")
+
+st.caption(
+    "An AI-Powered Escape Room | Version 1"
+)
 
 st.divider()
 
 
-# Sidebar
+# --------------------------------
+# SIDEBAR
+# --------------------------------
+
 with st.sidebar:
 
     st.header("⚔️ Dungeon Status")
 
     st.metric(
-        "Curse Marks",
-        f"{st.session_state.curse_marks}/{MAX_CURSE_MARKS}"
+        "Completed Trials",
+        f"{st.session_state.trials_completed}/{TOTAL_TRIALS}",
     )
 
     st.metric(
-        "Trials",
-        f"0/{TOTAL_TRIALS}"
+        "Curse Marks",
+        f"{st.session_state.curse_marks}/{MAX_CURSE_MARKS}",
+    )
+
+    st.progress(
+        st.session_state.trials_completed / TOTAL_TRIALS
     )
 
     st.divider()
@@ -121,12 +205,25 @@ with st.sidebar:
 
     st.divider()
 
-    if st.button("🔄 Restart Dungeon", use_container_width=True):
-        start_game()
+    if st.session_state.escaped:
+        st.success("🏆 Dungeon escaped!")
+
+    elif st.session_state.game_over:
+        st.error("💀 Dungeon journey ended.")
+
+    if st.button(
+        "🔄 Restart Dungeon",
+        use_container_width=True,
+    ):
+        with st.spinner("Restarting the dungeon..."):
+            start_game()
         st.rerun()
 
 
-# Welcome screen
+# --------------------------------
+# GAME START SCREEN
+# --------------------------------
+
 if not st.session_state.game_started:
 
     st.subheader("Your journey begins...")
@@ -138,17 +235,25 @@ if not st.session_state.game_started:
     )
 
     st.warning(
-        "Three incorrect puzzle answers will turn you "
-        "into a permanent stone guardian."
+        "Three incorrect puzzle answers will turn "
+        "you into a permanent stone guardian."
     )
 
-    if st.button("⚔️ ENTER THE DUNGEON", use_container_width=True):
+    if st.button(
+        "⚔️ ENTER THE DUNGEON",
+        use_container_width=True,
+    ):
+
         with st.spinner("Awakening the dungeon guardian..."):
             start_game()
+
         st.rerun()
 
 
-# Game interface
+# --------------------------------
+# ACTIVE GAME SCREEN
+# --------------------------------
+
 else:
 
     st.subheader("💀 The Dungeon Guardian")
@@ -158,7 +263,19 @@ else:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if not st.session_state.game_over:
+    if st.session_state.escaped:
+
+        st.success(
+            "🏆 Congratulations! You have escaped the Cursed Dungeon!"
+        )
+
+    elif st.session_state.game_over:
+
+        st.error(
+            "Your journey has ended. Restart the dungeon to try again."
+        )
+
+    else:
 
         user_input = st.chat_input(
             "Talk to the guardian, examine an object, or solve a puzzle..."
@@ -168,9 +285,6 @@ else:
 
             with st.spinner("The guardian is thinking..."):
 
-                send_message(user_input)
+                send_player_message(user_input)
 
             st.rerun()
-
-    else:
-        st.error("Your journey has ended. Restart to play again.")
